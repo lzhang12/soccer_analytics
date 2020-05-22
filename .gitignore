@@ -1,5 +1,5 @@
 # customized
-./data/Wyscout/*
+./data/Wyscout/**.json
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

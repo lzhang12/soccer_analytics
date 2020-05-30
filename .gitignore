@@ -1,6 +1,10 @@
-# customized
+# Data files
 data/Wyscout/*.json
 data/Wyscout/*/*.json
+
+# Backup files
+*/*_backup.py
+*_backup.py
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

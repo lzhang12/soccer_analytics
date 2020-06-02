@@ -2,9 +2,10 @@
 This is a repo to present examples of soccer analytics using Python made by myself. The datasets are collected from open datasets published freely online.
 
 ## Notebooks
-- `score_time.ipynb` : analyses if scoring time is random or not ?
+- `score_time.ipynb` : is scoring time in a match random or not ?
 <p align="center">
-<img src="./figs/PL_score_time.png" style="zoom:7.5%;" />
+<img src="./figs/PL_score_time.png" style="zoom:5%;" />
+<img src="./figs/homeaway_scoring_time.png" style="zoom:3%;" />
 </p>
 
 - `narrative_generator.ipynb` : generate narratives from the events data

@@ -66,7 +66,7 @@ def download_data():
     return
 
 
-def add_event_cols(events, cols):
+def add_event_cols(events, cols, match_file=None):
     """
     Add columns in events Dataframe
 
@@ -79,6 +79,7 @@ def add_event_cols(events, cols):
     """
 
     for col in cols:
+
         if col == 'team':
             df_team = pd.read_json(_TEAMFILE)
             teamId2team = dict(zip(df_team['wyId'], df_team['name']))
@@ -97,6 +98,11 @@ def add_event_cols(events, cols):
 
         elif col == 'time': # time format = (match_half=1/2, match_minute --> int, match_sec --> int)
             events['time'] = events.apply(lambda x: (int(x['matchPeriod'][0]), int(x['eventSec']//60), round(x['eventSec']%60)), axis=1)
+
+        elif col == 'homeaway':
+            df_match = pd.read_json(match_file)
+            matchId2homeaway = dict(zip(df_match['wyId'], df_match['teamsData'].apply(lambda x: {i['teamId']:i['side'] for i in x.values()})))
+            events['homeaway'] = events[['matchId', 'teamId']].apply(lambda x: matchId2homeaway[x['matchId']][x['teamId']], axis=1)
 
         else:
             print('ADDING COLUMN NOT AVAILABLE')
@@ -158,9 +164,10 @@ def is_successful_pass(event, next_event):
     """
     check if a successuful pass
     """
-    if event['team'] == next_event['team']:
+    if 'Not accurate' not in event['taglist'] and event['team'] == next_event['team']:
         return True
     return False
+
 
 def generate_narrative(events):
     """

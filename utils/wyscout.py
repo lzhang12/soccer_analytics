@@ -83,26 +83,26 @@ def add_event_cols(events, cols, match_file=None):
         if col == 'team':
             df_team = pd.read_json(_TEAMFILE)
             teamId2team = dict(zip(df_team['wyId'], df_team['name']))
-            events['team'] = events.teamId.apply(lambda x: teamId2team[x])
+            events.loc[:,'team'] = events.teamId.apply(lambda x: teamId2team[x])
 
         elif col == 'player':
             df_player = pd.read_json(_PLAYERFILE)
             playerId2player = dict(zip(df_player['wyId'], df_player['shortName']))
             playerId2player[0] = '' #  Interruption has playerId 0, and some free kicks missing player has playerId = 0.
-            events['player'] = events.playerId.apply(lambda x: playerId2player[x])
+            events.loc[:,'player'] = events.playerId.apply(lambda x: playerId2player[x])
 
         elif col == 'taglist':
             df_tag = pd.read_csv(_TAGFILE, sep=';')
             tagId2tag = dict(zip(df_tag['Tag'], df_tag['Description']))
-            events['taglist'] = events.tags.apply(lambda x: [tagId2tag[i['id']] for i in x])
+            events.loc[:,'taglist'] = events.tags.apply(lambda x: [tagId2tag[i['id']] for i in x])
 
         elif col == 'time': # time format = (match_half=1/2, match_minute --> int, match_sec --> int)
-            events['time'] = events.apply(lambda x: (int(x['matchPeriod'][0]), int(x['eventSec']//60), round(x['eventSec']%60)), axis=1)
+            events.loc[:,'time'] = events.apply(lambda x: (int(x['matchPeriod'][0]), int(x['eventSec']//60), round(x['eventSec']%60)), axis=1)
 
         elif col == 'homeaway':
             df_match = pd.read_json(match_file)
             matchId2homeaway = dict(zip(df_match['wyId'], df_match['teamsData'].apply(lambda x: {i['teamId']:i['side'] for i in x.values()})))
-            events['homeaway'] = events[['matchId', 'teamId']].apply(lambda x: matchId2homeaway[x['matchId']][x['teamId']], axis=1)
+            events.loc[:,'homeaway'] = events[['matchId', 'teamId']].apply(lambda x: matchId2homeaway[x['matchId']][x['teamId']], axis=1)
 
         else:
             print('ADDING COLUMN NOT AVAILABLE')
@@ -179,7 +179,7 @@ def generate_narrative(events):
     Return:
         narrative = list of event narrative
     """
-    dict_events = events.to_dict('records')  # faster loop over list of dicts
+    dict_events = events.to_dict('records')  # loop over list of dicts is faster
     narrative = []
 
     dict_next_events = dict_events[1:]
@@ -219,3 +219,80 @@ def generate_narrative(events):
         narrative.append(str_)
 
     return narrative
+
+
+def events_to_possession(events):
+    """
+    extract possession from match events data
+    possession ends if one of the following situations happens:
+    1) end of half match; 2) interruption due to ball-out-of-field, offside or foul; 3)
+
+    Argument:
+        events = Dataframe of single match events
+
+    Return:
+        possession = list of possissions in format of (team/teamId, (start_time, start_event), (end_time, end_event), [segment of events in between])
+    """
+
+    dict_events = events.to_dict('records')  # loop over list of dicts is faster
+    dict_next_events = dict_events[1:]
+    dict_next_events.append({key:[] for key in dict_events[0].keys()})
+
+    possession = []
+    segment = []
+    new_possession = True
+    for event, next_event in zip(dict_events, dict_next_events):
+
+        if new_possession:
+            team_in_possess = event['team']
+            start_time = event['time']
+            start_event = event['eventName']
+            new_possession = False
+
+        segment.append(event)
+
+        if is_possession_end(event, next_event, team_in_possess):
+            end_time = event['time']
+            end_event = event['eventName']
+            possession.append((team_in_possess, (start_time, start_event), (end_time, end_event), segment))
+            segment = []
+            new_possession = True
+
+    return possession
+
+
+def is_possession_end(event, next_event, team_in_possess):
+    """
+    Return True if possession ends
+    """
+    # end of event
+    if not next_event['eventId']: return True
+
+    if is_end_of_half(event, next_event): return True
+
+    if is_interruption(event): return True
+
+    if is_ball_lost(event, next_event, team_in_possess): return True
+
+    if is_save_attempt(event): return True
+
+    return False
+
+
+def is_end_of_half(event, next_event):
+    return event['time'][0] != next_event['time'][0]
+
+
+def is_interruption(event):
+    return event['eventName'] in ['Interruption', 'Foul', 'Offside']
+
+
+def is_ball_lost(event, next_event, team_in_possess):
+
+    if event['teamId'] != next_event['teamId'] and next_event['team']!=team_in_possess:
+        if next_event['eventName'] in ['Pass', 'Shot'] or 'Interception' in next_event['taglist']: return True
+
+    return False
+
+def is_save_attempt(event):
+    return event['eventName'] in ['Save attempt']
